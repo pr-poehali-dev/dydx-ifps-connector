@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "name": "Get market data from dYdX v4",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "tokens": "array"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

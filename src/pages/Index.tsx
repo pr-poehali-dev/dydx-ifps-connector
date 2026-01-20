@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,52 @@ const Index = () => {
   const [toToken, setToToken] = useState('ETH');
   const [swapAmount, setSwapAmount] = useState('');
   const [notifications, setNotifications] = useState(true);
+  const [tokens, setTokens] = useState(mockTokens);
+  const [isLoading, setIsLoading] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [chartData, setChartData] = useState<any>(null);
+
+  useEffect(() => {
+    fetchMarketData();
+  }, []);
+
+  const fetchMarketData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('https://functions.poehali.dev/8421694d-d6df-4175-ae90-443b57136abc');
+      const data = await response.json();
+      if (data.tokens && data.tokens.length > 0) {
+        setTokens(data.tokens);
+      }
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchChartData = async (symbol: string) => {
+    try {
+      const response = await fetch(`https://functions.poehali.dev/85aa3c01-a0b9-433d-a255-b2948406a4a3?symbol=${symbol}`);
+      const data = await response.json();
+      setChartData(data);
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+    }
+  };
+
+  const connectWallet = async () => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        setWalletAddress(accounts[0]);
+      } catch (error) {
+        console.error('Error connecting wallet:', error);
+      }
+    } else {
+      alert('MetaMask не установлен! Установите расширение MetaMask для подключения кошелька.');
+    }
+  };
 
   const totalPortfolioValue = mockPortfolio.reduce((acc, item) => acc + item.value, 0);
 
@@ -56,9 +102,12 @@ const Index = () => {
                   <Icon name="Bell" size={18} className="mr-2" />
                   Уведомления
                 </Button>
-                <Button className="bg-gradient-to-r from-primary to-secondary neon-glow-cyan font-semibold">
+                <Button 
+                  onClick={connectWallet}
+                  className="bg-gradient-to-r from-primary to-secondary neon-glow-cyan font-semibold"
+                >
                   <Icon name="Wallet" size={18} className="mr-2" />
-                  Подключить кошелёк
+                  {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Подключить кошелёк'}
                 </Button>
               </div>
             </div>
@@ -176,7 +225,7 @@ const Index = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockTokens.map((token) => (
+                      {tokens.map((token) => (
                         <tr key={token.symbol} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                           <td className="p-4">
                             <div className="flex items-center gap-3">
@@ -381,17 +430,49 @@ const Index = () => {
                 <h2 className="text-2xl font-bold orbitron mb-4 text-neon-cyan">Графики цен (IPFS данные)</h2>
                 <div className="flex gap-2 mb-6">
                   {['1H', '4H', '1D', '1W', '1M', '1Y'].map((period) => (
-                    <Button key={period} variant="outline" size="sm" className="glass border-white/20">
+                    <Button 
+                      key={period} 
+                      variant="outline" 
+                      size="sm" 
+                      className="glass border-white/20"
+                      onClick={() => fetchChartData('BTC')}
+                    >
                       {period}
                     </Button>
                   ))}
                 </div>
-                <div className="glass-strong rounded-lg border border-white/10 p-8 flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <Icon name="LineChart" size={64} className="mx-auto mb-4 text-primary opacity-50" />
-                    <p className="text-muted-foreground">График будет загружен из IPFS Kubo</p>
-                    <p className="text-sm text-muted-foreground mt-2">Исторические данные рынка в децентрализованном хранилище</p>
-                  </div>
+                <div className="glass-strong rounded-lg border border-white/10 p-8 h-96">
+                  {chartData ? (
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-4">
+                        <span>Источник: {chartData.source}</span>
+                        <span className="ml-4">IPFS CID: {chartData.ipfs_cid?.slice(0, 12)}...</span>
+                      </div>
+                      <div className="space-y-2">
+                        {chartData.data?.slice(0, 6).map((candle: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center p-3 glass rounded border border-white/5">
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(candle.timestamp).toLocaleDateString()}
+                            </span>
+                            <div className="flex gap-4 text-sm font-mono">
+                              <span>O: ${candle.open.toFixed(2)}</span>
+                              <span>H: ${candle.high.toFixed(2)}</span>
+                              <span>L: ${candle.low.toFixed(2)}</span>
+                              <span className="font-bold">C: ${candle.close.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <Icon name="LineChart" size={64} className="mx-auto mb-4 text-primary opacity-50" />
+                        <p className="text-muted-foreground">Нажмите на период для загрузки данных из IPFS Kubo</p>
+                        <p className="text-sm text-muted-foreground mt-2">Исторические данные рынка в децентрализованном хранилище</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
             </TabsContent>
@@ -408,12 +489,24 @@ const Index = () => {
                     </h3>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center p-4 glass rounded-lg border border-white/10">
-                        <span>Подключён</span>
-                        <Badge variant="outline" className="text-red-400 border-red-400">Не подключён</Badge>
+                        <span>Статус подключения</span>
+                        <Badge variant="outline" className={walletAddress ? "text-green-400 border-green-400" : "text-red-400 border-red-400"}>
+                          {walletAddress ? 'Подключён' : 'Не подключён'}
+                        </Badge>
                       </div>
-                      <Button className="w-full bg-gradient-to-r from-primary to-secondary neon-glow-cyan">
+                      {walletAddress && (
+                        <div className="p-4 glass rounded-lg border border-white/10">
+                          <div className="text-sm text-muted-foreground mb-1">Адрес кошелька</div>
+                          <div className="font-mono text-sm">{walletAddress}</div>
+                        </div>
+                      )}
+                      <Button 
+                        onClick={connectWallet}
+                        className="w-full bg-gradient-to-r from-primary to-secondary neon-glow-cyan"
+                        disabled={!!walletAddress}
+                      >
                         <Icon name="Link" size={16} className="mr-2" />
-                        Подключить MetaMask
+                        {walletAddress ? 'Кошелёк подключён' : 'Подключить MetaMask'}
                       </Button>
                     </div>
                   </div>

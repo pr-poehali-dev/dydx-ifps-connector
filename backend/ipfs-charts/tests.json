@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "name": "Get chart data from IPFS",
+      "method": "GET",
+      "path": "/?symbol=BTC",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "symbol": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
